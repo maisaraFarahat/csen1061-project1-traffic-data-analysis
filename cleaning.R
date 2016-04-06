@@ -1,4 +1,3 @@
-
 library(ggplot2)
 library(dplyr)
 library(knitr)
@@ -26,9 +25,21 @@ data.road <- data.road %>% mutate(report_time = as.POSIXct(round(crawl_date - (r
 
 glimpse(data.road)
 
-data.road <- data.road %>% separate(rd.nm, c("rd.majornm", "rd.minornm"), ";")
+data.road <- data.road %>% separate(rd.nm, c("rd.primary", "rd.secondary"), ";")
 
-data.road$rd.minornm[is.na(data.road$rd.minornm)] <- "general"
+data.road$rd.secondary[is.na(data.road$rd.secondary)] <- "general"
 
 glimpse(data.road)
 
+data.road <- data.road %>% select(-(rd.rp.rpImg), -(rd.rp.img))
+
+data.road <- data.road %>% select(-(rd.img))
+
+glimpse(data.road)
+
+#data.raw678 <- data.road[data.road$rd.ri==678,]
+#data.raw6788 <- subset(data.road, rd.ri == 678)
+
+data.road.status <- data.road %>% select(crawl_date, rd.ri, rd.stid) %>% unique()
+
+glimpse(data.road.status)
