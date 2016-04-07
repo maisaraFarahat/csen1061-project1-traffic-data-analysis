@@ -3,4 +3,92 @@ title: Traffic Data Analysis
 output: html_document
 ---
 
-this is where things start :)
+##initialization
+```{r}
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(tidyr)
+library(readr)
+library(corrplot)
+
+data.raw <- read.csv("C:/Users/USER/Desktop/csen1061-project1-traffic-data-analysis/all-semi-unique.csv")
+```
+First we take a look at the data
+```{r}
+glimpse(data.raw)
+```
+
+## removing ads
+We found some ads in the data, they won't be of any benefit to us so we have to remove them
+```{r}
+data.road <- data.raw %>% select(-(starts_with("ad.")))
+```
+
+## removing images
+We also found some images that do not represent any thing so we will delete them as well
+```{r}
+
+data.road <- data.road %>% select(-(rd.rp.rpImg), -(rd.rp.img))
+
+data.road <- data.road %>% select(-(rd.img))
+```
+
+## removing constant columns
+I saw that there are some columns of the same value so after testing i found that there are 2 columns rd.cl and rd.rp.type with the same value for all unput, these also won't be of any benefit and should be removed.
+```{r}
+data.road %>%sapply(unique) %>%sapply(length)
+
+data.road <- data.road %>% select(-(rd.cl), -(rd.rp.type))
+```
+## formating the date
+we saw that the date has a format that isn't really useful so we have to reformat it.
+```{r}
+head(data.road$crawl_date)
+
+data.road$crawl_date <- strptime(data.road$crawl_date, format = "%a %b %e %X UTC %Y", tz = "UTC") %>% as.POSIXct()
+
+head(data.road$crawl_date)
+```
+
+## estimating the actual report time
+```{r}
+data.road <- data.road %>% mutate(report_time = as.POSIXct(round(crawl_date - (rd.rp.hr*60*60 + rd.rp.mn*60), "mins"))) %>% select(-c(rd.rp.mn, rd.rp.hr))
+```
+
+## dividing the road into a primary and secondary streets
+i found that some of rd.nm column has 2 values separated by a ; so lets get them actually separated.
+```{r}
+glimpse(data.road)
+
+data.road <- data.road %>% separate(rd.nm, c("rd.primary", "rd.secondary"), ";")
+```
+and some secondary roads weren't present so they introduced some new NA's and we should reconstruct them to be able to come up with any data later.
+```{r}
+data.road$rd.secondary[is.na(data.road$rd.secondary)] <- "general"
+
+glimpse(data.road)
+```
+## getting status reports
+we can separate the status of the reports of the data for further investigation.
+```{r}
+data.road.status <- data.road %>% select(crawl_date, rd.ri, rd.stid) %>% unique()
+
+glimpse(data.road.status)
+```
+
+## removing duplicates
+we found some duplicates in the data because of the way the data were crawled so we have to remove it.
+```{r}
+data.road <- data.road[!(data.road$rd.rp.cmid %>% duplicated),]
+```
+## seperating all reports alone
+lets take a deeper look at the reports alone by separating them.
+```{r}
+data.road.reports <- data.road %>%  select(rd.ri, rd.rp.fullnm, rd.rp.stid, rd.rp.cm, rd.rp.cmid, report_time, rd.primary, rd.secondary) %>% unique()
+```
+## trying to get crowded info
+trying to summarize the data to know which roads are the most crowded.
+```{r}
+crowded_roads <- data.road.reports %>% group_by(rd.primary) %>% summarise(crowded = mean(rd.rp.stid))
+```
